@@ -27,6 +27,7 @@ module.exports = {
     'react/react-in-jsx-scope': 'off',
     'react/jsx-filename-extension': ['warn', { extensions: ['.tsx'] }],
     'import/prefer-default-export': 'off',
+    'no-empty': ['error', { allowEmptyCatch: true }],
     'import/no-extraneous-dependencies': [
       'error',
       {

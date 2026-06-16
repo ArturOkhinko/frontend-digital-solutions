@@ -11,6 +11,7 @@ const firstPage = Array.from({ length: 20 }, (_, index) => index + 1);
 
 describe('App', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     jest.spyOn(global, 'fetch').mockResolvedValue(itemsResponse(firstPage, 20));
   });
 

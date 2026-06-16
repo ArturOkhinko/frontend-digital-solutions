@@ -169,4 +169,14 @@ function ItemPanel({
   );
 }
 
+ItemPanel.defaultProps = {
+  onReorder: undefined,
+  onAddItem: undefined,
+  onGenerateItem: undefined,
+  onReachEnd: undefined,
+  loading: false,
+  searchValue: undefined,
+  onSearchChange: undefined,
+};
+
 export default ItemPanel;

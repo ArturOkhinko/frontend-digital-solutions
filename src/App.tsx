@@ -5,16 +5,18 @@ import ItemPanel from './components/ItemPanel';
 import { createItem } from './api/items';
 import { useInfiniteItems } from './hooks/useInfiniteItems';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
+import { usePersistedState } from './hooks/usePersistedState';
 import { ItemId } from './types';
 
 const { Title } = Typography;
 const SEARCH_DEBOUNCE_MS = 300;
+const SELECTED_STORAGE_KEY = 'split-screen.selected';
 
 function App() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const { ids: loadedIds, loading, loadMore, addId } = useInfiniteItems(debouncedSearch);
-  const [selectedIds, setSelectedIds] = useState<ItemId[]>([]);
+  const [selectedIds, setSelectedIds] = usePersistedState<ItemId[]>(SELECTED_STORAGE_KEY, []);
 
   const selectItem = (id: ItemId) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -40,11 +42,11 @@ function App() {
     }
     const asNumber = Number(trimmed);
     const id: ItemId = !Number.isNaN(asNumber) && String(asNumber) === trimmed ? asNumber : trimmed;
-    void persistAndAdd(id);
+    persistAndAdd(id);
   };
 
   const addGeneratedItem = () => {
-    void persistAndAdd(uuidv7());
+    persistAndAdd(uuidv7());
   };
 
   const reorderSelected = (draggedId: ItemId, targetId: ItemId) => {
