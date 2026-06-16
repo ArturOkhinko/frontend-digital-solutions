@@ -35,12 +35,26 @@ describe('App', () => {
     expect(screen.getByTestId('available-item-20')).toBeInTheDocument();
   });
 
-  it('checks an item and reflects it in the action button count', async () => {
+  it('sends a select request when an available item is clicked', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('available-item-5')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('available-item-5'));
 
-    expect(screen.getByTestId('available-panel-action')).toHaveTextContent('Add to selected (1)');
+    await waitFor(
+      () => {
+        const selectCall = (global.fetch as jest.Mock).mock.calls.find(([input, init]) => {
+          const body = (init as RequestInit | undefined)?.body;
+          return (
+            String(input).endsWith('/selected') &&
+            (init as RequestInit | undefined)?.method === 'POST' &&
+            typeof body === 'string' &&
+            body.includes('5')
+          );
+        });
+        expect(selectCall).toBeDefined();
+      },
+      { timeout: 2500 },
+    );
   });
 });

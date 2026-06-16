@@ -1,5 +1,5 @@
 import { UIEvent, useRef } from 'react';
-import { Button, Card, Checkbox, Input, List, Space, Spin } from 'antd';
+import { Button, Card, Input, List, Space, Spin } from 'antd';
 import { ItemId } from '../types';
 
 interface ItemPanelProps {
@@ -7,14 +7,11 @@ interface ItemPanelProps {
   ids: ItemId[];
   testId: string;
   itemTestIdPrefix: string;
-  checkedIds: ItemId[];
-  onToggleCheck: (id: ItemId) => void;
+  onItemClick: (id: ItemId) => void;
   searchValue: string;
   onSearchChange: (value: string) => void;
   loading?: boolean;
   onReachEnd?: () => void;
-  actionLabel?: string;
-  onAction?: () => void;
   onReorder?: (draggedId: ItemId, targetId: ItemId) => void;
   onAddItem?: (rawId: string) => void;
   onGenerateItem?: () => void;
@@ -29,14 +26,11 @@ function ItemPanel({
   ids,
   testId,
   itemTestIdPrefix,
-  checkedIds,
-  onToggleCheck,
+  onItemClick,
   searchValue,
   onSearchChange,
   loading = false,
   onReachEnd = undefined,
-  actionLabel = undefined,
-  onAction = undefined,
   onReorder = undefined,
   onAddItem = undefined,
   onGenerateItem = undefined,
@@ -47,7 +41,6 @@ function ItemPanel({
 
   const isDraggable = Boolean(onReorder);
   const canAdd = Boolean(onAddItem);
-  const checked = new Set(checkedIds);
 
   const handleAdd = () => {
     if (onAddItem) {
@@ -116,24 +109,13 @@ function ItemPanel({
         data-testid={`${testId}-filter`}
       />
 
-      {actionLabel && (
-        <Button
-          onClick={onAction}
-          disabled={checkedIds.length === 0}
-          style={{ marginBottom: 12 }}
-          data-testid={`${testId}-action`}
-        >
-          {`${actionLabel} (${checkedIds.length})`}
-        </Button>
-      )}
-
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} onScroll={handleScroll}>
         <List
           dataSource={ids}
           locale={{ emptyText: 'No items' }}
           renderItem={(id) => (
             <List.Item
-              onClick={() => onToggleCheck(id)}
+              onClick={() => onItemClick(id)}
               style={{ cursor: isDraggable ? 'grab' : 'pointer' }}
               data-testid={`${itemTestIdPrefix}-${id}`}
               draggable={isDraggable}
@@ -152,12 +134,6 @@ function ItemPanel({
                 }
               }}
             >
-              <Checkbox
-                checked={checked.has(id)}
-                onChange={() => onToggleCheck(id)}
-                onClick={(event) => event.stopPropagation()}
-                style={{ marginRight: 8 }}
-              />
               {`id: ${id}`}
             </List.Item>
           )}

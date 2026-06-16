@@ -3,8 +3,13 @@ import { ItemsPage } from '../api/items';
 import { ItemId } from '../types';
 
 const PAGE_SIZE = 20;
+const MAX_REFRESH = 100;
 
-export type ItemsFetcher = (lastId?: ItemId, search?: string) => Promise<ItemsPage>;
+export type ItemsFetcher = (
+  lastId?: ItemId,
+  search?: string,
+  limit?: number,
+) => Promise<ItemsPage>;
 
 export interface InfiniteItems {
   ids: ItemId[];
@@ -12,6 +17,7 @@ export interface InfiniteItems {
   hasMore: boolean;
   loadMore: () => void;
   reload: () => void;
+  refresh: () => void;
 }
 
 export const useInfiniteItems = (fetcher: ItemsFetcher, search: string): InfiniteItems => {
@@ -23,6 +29,11 @@ export const useInfiniteItems = (fetcher: ItemsFetcher, search: string): Infinit
   const hasMoreRef = useRef(true);
   const loadingRef = useRef(false);
   const requestIdRef = useRef(0);
+  const loadedCountRef = useRef(0);
+
+  useEffect(() => {
+    loadedCountRef.current = ids.length;
+  }, [ids]);
 
   const load = useCallback(
     (reset: boolean) => {
@@ -74,11 +85,33 @@ export const useInfiniteItems = (fetcher: ItemsFetcher, search: string): Infinit
     load(true);
   }, [load]);
 
+  const refresh = useCallback(() => {
+    if (loadingRef.current) {
+      return;
+    }
+    const limit = Math.min(Math.max(loadedCountRef.current, PAGE_SIZE), MAX_REFRESH);
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    fetcher(undefined, search || undefined, limit)
+      .then((page) => {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+        cursorRef.current = page.lastId ?? undefined;
+        const more = page.ids.length === limit && page.lastId !== null;
+        hasMoreRef.current = more;
+        setHasMore(more);
+        setIds(page.ids);
+      })
+      .catch(() => undefined);
+  }, [fetcher, search]);
+
   useEffect(() => {
     cursorRef.current = undefined;
     hasMoreRef.current = true;
     load(true);
   }, [load]);
 
-  return { ids, loading, hasMore, loadMore, reload };
+  return { ids, loading, hasMore, loadMore, reload, refresh };
 };

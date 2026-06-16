@@ -1,22 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfigProvider, Divider, message, Typography } from 'antd';
 import { v7 as uuidv7 } from 'uuid';
 import ItemPanel from './components/ItemPanel';
-import { createItem, fetchItems } from './api/items';
-import { deselectItems, fetchSelected, reorderSelected, selectItems } from './api/selected';
+import { createItems, fetchItems } from './api/items';
+import { fetchSelected } from './api/selected';
 import { useInfiniteItems } from './hooks/useInfiniteItems';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
+import { createBatcher, Batcher } from './batching/createBatcher';
+import { flushModifications, ModifyOp } from './batching/modify';
 import { ItemId } from './types';
 
 const { Title } = Typography;
 const SEARCH_DEBOUNCE_MS = 300;
+const ADD_BATCH_MS = 10000;
+const MODIFY_BATCH_MS = 1000;
+const READ_INTERVAL_MS = 1000;
 
 function App() {
   const [availableSearch, setAvailableSearch] = useState('');
   const [selectedSearch, setSelectedSearch] = useState('');
-  const [checkedAvailable, setCheckedAvailable] = useState<ItemId[]>([]);
-  const [checkedSelected, setCheckedSelected] = useState<ItemId[]>([]);
   const [newId, setNewId] = useState('');
+  const [pendingSelect, setPendingSelect] = useState<ItemId[]>([]);
+  const [pendingDeselect, setPendingDeselect] = useState<ItemId[]>([]);
 
   const debouncedAvailableSearch = useDebouncedValue(availableSearch, SEARCH_DEBOUNCE_MS);
   const debouncedSelectedSearch = useDebouncedValue(selectedSearch, SEARCH_DEBOUNCE_MS);
@@ -24,50 +29,107 @@ function App() {
   const available = useInfiniteItems(fetchItems, debouncedAvailableSearch);
   const selected = useInfiniteItems(fetchSelected, debouncedSelectedSearch);
 
-  const toggle = (setChecked: typeof setCheckedAvailable) => (id: ItemId) => {
-    setChecked((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  const availableApi = useRef(available);
+  const selectedApi = useRef(selected);
+  const pendingMoreAvailable = useRef(false);
+  const pendingMoreSelected = useRef(false);
+  const addBatcher = useRef<Batcher<ItemId>>();
+  const modifyBatcher = useRef<Batcher<ModifyOp>>();
+
+  useEffect(() => {
+    availableApi.current = available;
+    selectedApi.current = selected;
+  });
+
+  useEffect(() => {
+    const add = createBatcher<ItemId>(ADD_BATCH_MS, (ids) => {
+      createItems(Array.from(new Set(ids))).catch(() => message.error('Failed to add items'));
+    });
+    const modify = createBatcher<ModifyOp>(MODIFY_BATCH_MS, (ops) => {
+      flushModifications(ops).catch(() => {
+        setPendingSelect([]);
+        setPendingDeselect([]);
+        message.error('Failed to update selection');
+      });
+    });
+    addBatcher.current = add;
+    modifyBatcher.current = modify;
+
+    const tick = (api: typeof availableApi, pending: typeof pendingMoreAvailable) => {
+      if (pending.current) {
+        pending.current = false;
+        api.current.loadMore();
+      } else {
+        api.current.refresh();
+      }
+    };
+    const readTimer = setInterval(() => {
+      tick(availableApi, pendingMoreAvailable);
+      tick(selectedApi, pendingMoreSelected);
+    }, READ_INTERVAL_MS);
+
+    const flushOnHide = () => {
+      add.flushNow();
+      modify.flushNow();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        flushOnHide();
+      }
+    };
+    window.addEventListener('pagehide', flushOnHide);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      add.stop();
+      modify.stop();
+      clearInterval(readTimer);
+      window.removeEventListener('pagehide', flushOnHide);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  const selectItem = (id: ItemId) => {
+    modifyBatcher.current?.push({ type: 'select', ids: [id] });
+    setPendingDeselect((prev) => prev.filter((item) => item !== id));
+    setPendingSelect((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
 
-  const reloadBoth = () => {
-    available.reload();
-    selected.reload();
+  const deselectItem = (id: ItemId) => {
+    modifyBatcher.current?.push({ type: 'deselect', ids: [id] });
+    setPendingSelect((prev) => prev.filter((item) => item !== id));
+    setPendingDeselect((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
 
-  const addToSelection = async () => {
-    if (checkedAvailable.length === 0) {
-      return;
-    }
-    try {
-      await selectItems(checkedAvailable);
-      setCheckedAvailable([]);
-      reloadBoth();
-    } catch {
-      message.error('Failed to select items');
-    }
-  };
+  useEffect(() => {
+    setPendingSelect((prev) => {
+      const next = prev.filter((id) => !selected.ids.includes(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [selected.ids]);
 
-  const removeFromSelection = async () => {
-    if (checkedSelected.length === 0) {
-      return;
-    }
-    try {
-      await deselectItems(checkedSelected);
-      setCheckedSelected([]);
-      reloadBoth();
-    } catch {
-      message.error('Failed to remove items');
-    }
-  };
+  useEffect(() => {
+    setPendingDeselect((prev) => {
+      const next = prev.filter((id) => !available.ids.includes(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [available.ids]);
 
-  const persistAndAdd = async (id: ItemId) => {
-    try {
-      await createItem(id);
-      setNewId('');
-      available.reload();
-    } catch {
-      message.error(`Failed to add item "${String(id)}"`);
-    }
-  };
+  const availableIds = useMemo(
+    () => [
+      ...available.ids.filter((id) => !pendingSelect.includes(id)),
+      ...pendingDeselect.filter((id) => !available.ids.includes(id)),
+    ],
+    [available.ids, pendingSelect, pendingDeselect],
+  );
+
+  const selectedIds = useMemo(
+    () => [
+      ...selected.ids.filter((id) => !pendingDeselect.includes(id)),
+      ...pendingSelect.filter((id) => !selected.ids.includes(id)),
+    ],
+    [selected.ids, pendingSelect, pendingDeselect],
+  );
 
   const addItem = (rawId: string) => {
     const trimmed = rawId.trim();
@@ -76,23 +138,19 @@ function App() {
     }
     const asNumber = Number(trimmed);
     const id: ItemId = !Number.isNaN(asNumber) && String(asNumber) === trimmed ? asNumber : trimmed;
-    persistAndAdd(id);
+    addBatcher.current?.push(id);
+    setNewId('');
   };
 
   const addGeneratedItem = () => {
-    persistAndAdd(uuidv7());
+    addBatcher.current?.push(uuidv7());
   };
 
-  const reorder = async (draggedId: ItemId, targetId: ItemId) => {
-    const ordered = selected.ids.filter((id) => id !== draggedId);
+  const reorder = (draggedId: ItemId, targetId: ItemId) => {
+    const ordered = selectedIds.filter((id) => id !== draggedId);
     const targetIndex = ordered.indexOf(targetId);
     const afterId = targetIndex <= 0 ? null : ordered[targetIndex - 1];
-    try {
-      await reorderSelected(draggedId, afterId);
-      selected.reload();
-    } catch {
-      message.error('Failed to reorder');
-    }
+    modifyBatcher.current?.push({ type: 'reorder', id: draggedId, afterId });
   };
 
   return (
@@ -110,17 +168,16 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           <ItemPanel
             title="Available"
-            ids={available.ids}
+            ids={availableIds}
             testId="available-panel"
             itemTestIdPrefix="available-item"
-            checkedIds={checkedAvailable}
-            onToggleCheck={toggle(setCheckedAvailable)}
+            onItemClick={selectItem}
             searchValue={availableSearch}
             onSearchChange={setAvailableSearch}
             loading={available.loading}
-            onReachEnd={available.loadMore}
-            actionLabel="Add to selected"
-            onAction={addToSelection}
+            onReachEnd={() => {
+              pendingMoreAvailable.current = true;
+            }}
             onAddItem={addItem}
             onGenerateItem={addGeneratedItem}
             newId={newId}
@@ -131,17 +188,16 @@ function App() {
 
           <ItemPanel
             title="Selected"
-            ids={selected.ids}
+            ids={selectedIds}
             testId="selected-panel"
             itemTestIdPrefix="selected-item"
-            checkedIds={checkedSelected}
-            onToggleCheck={toggle(setCheckedSelected)}
+            onItemClick={deselectItem}
             searchValue={selectedSearch}
             onSearchChange={setSelectedSearch}
             loading={selected.loading}
-            onReachEnd={selected.loadMore}
-            actionLabel="Remove"
-            onAction={removeFromSelection}
+            onReachEnd={() => {
+              pendingMoreSelected.current = true;
+            }}
             onReorder={reorder}
           />
         </div>
