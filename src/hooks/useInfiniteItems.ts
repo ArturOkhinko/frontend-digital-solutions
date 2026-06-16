@@ -5,11 +5,7 @@ import { ItemId } from '../types';
 const PAGE_SIZE = 20;
 const MAX_REFRESH = 1000;
 
-export type ItemsFetcher = (
-  lastId?: ItemId,
-  search?: string,
-  limit?: number,
-) => Promise<ItemsPage>;
+export type ItemsFetcher = (lastId?: ItemId, search?: string, limit?: number) => Promise<ItemsPage>;
 
 export interface InfiniteItems {
   ids: ItemId[];
