@@ -48,9 +48,17 @@ function App() {
 
   return (
     <ConfigProvider>
-      <main style={{ padding: 24 }}>
+      <main
+        style={{
+          padding: 24,
+          height: '100vh',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <Title level={2}>Split screen</Title>
-        <div style={{ display: 'flex', alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           <ItemPanel
             title="Available"
             ids={availableIds}

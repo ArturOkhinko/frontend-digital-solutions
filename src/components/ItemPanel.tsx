@@ -40,7 +40,20 @@ function ItemPanel({
   };
 
   return (
-    <Card title={title} style={{ flex: 1 }} data-testid={testId}>
+    <Card
+      title={title}
+      style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{
+        body: {
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        },
+      }}
+      data-testid={testId}
+    >
       <Input
         allowClear
         placeholder="Filter by id"
@@ -49,34 +62,36 @@ function ItemPanel({
         style={{ marginBottom: 12 }}
         data-testid={`${testId}-filter`}
       />
-      <List
-        dataSource={visibleIds}
-        locale={{ emptyText: 'No items' }}
-        renderItem={(id) => (
-          <List.Item
-            onClick={() => onItemClick(id)}
-            style={{ cursor: isDraggable ? 'grab' : 'pointer' }}
-            data-testid={`${itemTestIdPrefix}-${id}`}
-            draggable={isDraggable}
-            onDragStart={() => {
-              draggedIdRef.current = id;
-            }}
-            onDragOver={(event) => {
-              if (isDraggable) {
-                event.preventDefault();
-              }
-            }}
-            onDrop={(event) => {
-              if (isDraggable) {
-                event.preventDefault();
-                handleDrop(id);
-              }
-            }}
-          >
-            {`id: ${id}`}
-          </List.Item>
-        )}
-      />
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <List
+          dataSource={visibleIds}
+          locale={{ emptyText: 'No items' }}
+          renderItem={(id) => (
+            <List.Item
+              onClick={() => onItemClick(id)}
+              style={{ cursor: isDraggable ? 'grab' : 'pointer' }}
+              data-testid={`${itemTestIdPrefix}-${id}`}
+              draggable={isDraggable}
+              onDragStart={() => {
+                draggedIdRef.current = id;
+              }}
+              onDragOver={(event) => {
+                if (isDraggable) {
+                  event.preventDefault();
+                }
+              }}
+              onDrop={(event) => {
+                if (isDraggable) {
+                  event.preventDefault();
+                  handleDrop(id);
+                }
+              }}
+            >
+              {`id: ${id}`}
+            </List.Item>
+          )}
+        />
+      </div>
     </Card>
   );
 }
