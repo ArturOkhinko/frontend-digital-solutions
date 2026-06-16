@@ -32,7 +32,7 @@ describe('App', () => {
   it('loads available items from the backend', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('available-item-1')).toBeInTheDocument());
-    expect(screen.getByTestId('available-item-20')).toBeInTheDocument();
+    expect(screen.getByTestId('available-item-5')).toBeInTheDocument();
   });
 
   it('sends a select request when an available item is clicked', async () => {

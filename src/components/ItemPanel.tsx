@@ -1,5 +1,5 @@
-import { UIEvent, useEffect, useRef } from 'react';
-import { Button, Card, Input, List, Space, Spin } from 'antd';
+import { Button, Card, Input, Space } from 'antd';
+import VirtualList from './VirtualList';
 import { ItemId } from '../types';
 
 interface ItemPanelProps {
@@ -20,8 +20,6 @@ interface ItemPanelProps {
   onNewIdChange?: (value: string) => void;
 }
 
-const SCROLL_THRESHOLD = 48;
-
 function ItemPanel({
   title,
   ids,
@@ -39,44 +37,11 @@ function ItemPanel({
   newId = '',
   onNewIdChange = undefined,
 }: ItemPanelProps) {
-  const draggedIdRef = useRef<ItemId | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-
-  const isDraggable = Boolean(onReorder);
   const canAdd = Boolean(onAddItem);
-
-  useEffect(() => {
-    if (!onReachEnd || !hasMore || loading || ids.length === 0) {
-      return;
-    }
-    const element = listRef.current;
-    if (element && element.scrollHeight <= element.clientHeight) {
-      onReachEnd();
-    }
-  }, [ids, loading, hasMore, onReachEnd]);
 
   const handleAdd = () => {
     if (onAddItem) {
       onAddItem(newId);
-    }
-  };
-
-  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
-    if (!onReachEnd) {
-      return;
-    }
-    const element = event.currentTarget;
-    const distanceToBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    if (distanceToBottom <= SCROLL_THRESHOLD) {
-      onReachEnd();
-    }
-  };
-
-  const handleDrop = (targetId: ItemId) => {
-    const draggedId = draggedIdRef.current;
-    draggedIdRef.current = null;
-    if (onReorder && draggedId !== null && draggedId !== targetId) {
-      onReorder(draggedId, targetId);
     }
   };
 
@@ -122,45 +87,16 @@ function ItemPanel({
         data-testid={`${testId}-filter`}
       />
 
-      <div
-        ref={listRef}
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
-        onScroll={handleScroll}
-      >
-        <List
-          dataSource={ids}
-          locale={{ emptyText: 'No items' }}
-          renderItem={(id) => (
-            <List.Item
-              onClick={() => onItemClick(id)}
-              style={{ cursor: isDraggable ? 'grab' : 'pointer' }}
-              data-testid={`${itemTestIdPrefix}-${id}`}
-              draggable={isDraggable}
-              onDragStart={() => {
-                draggedIdRef.current = id;
-              }}
-              onDragOver={(event) => {
-                if (isDraggable) {
-                  event.preventDefault();
-                }
-              }}
-              onDrop={(event) => {
-                if (isDraggable) {
-                  event.preventDefault();
-                  handleDrop(id);
-                }
-              }}
-            >
-              {`id: ${id}`}
-            </List.Item>
-          )}
-        />
-        {loading && (
-          <div style={{ padding: 8, textAlign: 'center' }} data-testid={`${testId}-loading`}>
-            <Spin size="small" />
-          </div>
-        )}
-      </div>
+      <VirtualList
+        ids={ids}
+        onItemClick={onItemClick}
+        itemTestIdPrefix={itemTestIdPrefix}
+        loading={loading}
+        hasMore={hasMore}
+        onReachEnd={onReachEnd}
+        sortable={Boolean(onReorder)}
+        onReorder={onReorder}
+      />
     </Card>
   );
 }
