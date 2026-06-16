@@ -10,6 +10,11 @@ export interface ItemsPage {
   lastId: ItemId | null;
 }
 
+const toPage = (data: { items: Item[]; lastId: ItemId | null }): ItemsPage => ({
+  ids: data.items.map((item) => item.id),
+  lastId: data.lastId,
+});
+
 export const fetchItems = async (lastId?: ItemId, search?: string): Promise<ItemsPage> => {
   const url = new URL(`${API_BASE_URL}/items`);
   if (lastId !== undefined) {
@@ -24,8 +29,7 @@ export const fetchItems = async (lastId?: ItemId, search?: string): Promise<Item
     throw new Error(`Failed to load items (status ${response.status})`);
   }
 
-  const data = (await response.json()) as { items: Item[]; lastId: ItemId | null };
-  return { ids: data.items.map((item) => item.id), lastId: data.lastId };
+  return toPage((await response.json()) as { items: Item[]; lastId: ItemId | null });
 };
 
 export const createItem = async (id: ItemId): Promise<Item> => {

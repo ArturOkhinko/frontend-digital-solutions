@@ -1,20 +1,25 @@
-import { UIEvent, useMemo, useRef, useState } from 'react';
-import { Button, Card, Input, List, Space, Spin } from 'antd';
+import { UIEvent, useRef } from 'react';
+import { Button, Card, Checkbox, Input, List, Space, Spin } from 'antd';
 import { ItemId } from '../types';
 
 interface ItemPanelProps {
   title: string;
   ids: ItemId[];
-  onItemClick: (id: ItemId) => void;
   testId: string;
   itemTestIdPrefix: string;
+  checkedIds: ItemId[];
+  onToggleCheck: (id: ItemId) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  loading?: boolean;
+  onReachEnd?: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
   onReorder?: (draggedId: ItemId, targetId: ItemId) => void;
   onAddItem?: (rawId: string) => void;
   onGenerateItem?: () => void;
-  onReachEnd?: () => void;
-  loading?: boolean;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
+  newId?: string;
+  onNewIdChange?: (value: string) => void;
 }
 
 const SCROLL_THRESHOLD = 48;
@@ -22,58 +27,31 @@ const SCROLL_THRESHOLD = 48;
 function ItemPanel({
   title,
   ids,
-  onItemClick,
   testId,
   itemTestIdPrefix,
+  checkedIds,
+  onToggleCheck,
+  searchValue,
+  onSearchChange,
+  loading = false,
+  onReachEnd = undefined,
+  actionLabel = undefined,
+  onAction = undefined,
   onReorder = undefined,
   onAddItem = undefined,
   onGenerateItem = undefined,
-  onReachEnd = undefined,
-  loading = false,
-  searchValue = undefined,
-  onSearchChange = undefined,
+  newId = '',
+  onNewIdChange = undefined,
 }: ItemPanelProps) {
-  const [localFilter, setLocalFilter] = useState('');
-  const [newId, setNewId] = useState('');
   const draggedIdRef = useRef<ItemId | null>(null);
-
-  const isServerSearch = Boolean(onSearchChange);
-  const filterValue = isServerSearch ? searchValue ?? '' : localFilter;
-
-  const visibleIds = useMemo(() => {
-    if (isServerSearch) {
-      return ids;
-    }
-    const query = localFilter.trim();
-    if (!query) {
-      return ids;
-    }
-    return ids.filter((id) => String(id).includes(query));
-  }, [ids, localFilter, isServerSearch]);
-
-  const handleFilterChange = (value: string) => {
-    if (onSearchChange) {
-      onSearchChange(value);
-    } else {
-      setLocalFilter(value);
-    }
-  };
 
   const isDraggable = Boolean(onReorder);
   const canAdd = Boolean(onAddItem);
+  const checked = new Set(checkedIds);
 
   const handleAdd = () => {
     if (onAddItem) {
       onAddItem(newId);
-      setNewId('');
-    }
-  };
-
-  const handleDrop = (targetId: ItemId) => {
-    const draggedId = draggedIdRef.current;
-    draggedIdRef.current = null;
-    if (onReorder && draggedId !== null) {
-      onReorder(draggedId, targetId);
     }
   };
 
@@ -85,6 +63,14 @@ function ItemPanel({
     const distanceToBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
     if (distanceToBottom <= SCROLL_THRESHOLD) {
       onReachEnd();
+    }
+  };
+
+  const handleDrop = (targetId: ItemId) => {
+    const draggedId = draggedIdRef.current;
+    draggedIdRef.current = null;
+    if (onReorder && draggedId !== null && draggedId !== targetId) {
+      onReorder(draggedId, targetId);
     }
   };
 
@@ -108,7 +94,7 @@ function ItemPanel({
           <Input
             placeholder="New id (number or string)"
             value={newId}
-            onChange={(event) => setNewId(event.target.value)}
+            onChange={(event) => onNewIdChange?.(event.target.value)}
             onPressEnter={handleAdd}
             data-testid={`${testId}-new-id`}
           />
@@ -124,19 +110,30 @@ function ItemPanel({
       <Input
         allowClear
         placeholder="Filter by id"
-        value={filterValue}
-        onChange={(event) => handleFilterChange(event.target.value)}
+        value={searchValue}
+        onChange={(event) => onSearchChange(event.target.value)}
         style={{ marginBottom: 12 }}
         data-testid={`${testId}-filter`}
       />
 
+      {actionLabel && (
+        <Button
+          onClick={onAction}
+          disabled={checkedIds.length === 0}
+          style={{ marginBottom: 12 }}
+          data-testid={`${testId}-action`}
+        >
+          {`${actionLabel} (${checkedIds.length})`}
+        </Button>
+      )}
+
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} onScroll={handleScroll}>
         <List
-          dataSource={visibleIds}
+          dataSource={ids}
           locale={{ emptyText: 'No items' }}
           renderItem={(id) => (
             <List.Item
-              onClick={() => onItemClick(id)}
+              onClick={() => onToggleCheck(id)}
               style={{ cursor: isDraggable ? 'grab' : 'pointer' }}
               data-testid={`${itemTestIdPrefix}-${id}`}
               draggable={isDraggable}
@@ -155,6 +152,12 @@ function ItemPanel({
                 }
               }}
             >
+              <Checkbox
+                checked={checked.has(id)}
+                onChange={() => onToggleCheck(id)}
+                onClick={(event) => event.stopPropagation()}
+                style={{ marginRight: 8 }}
+              />
               {`id: ${id}`}
             </List.Item>
           )}
@@ -168,15 +171,5 @@ function ItemPanel({
     </Card>
   );
 }
-
-ItemPanel.defaultProps = {
-  onReorder: undefined,
-  onAddItem: undefined,
-  onGenerateItem: undefined,
-  onReachEnd: undefined,
-  loading: false,
-  searchValue: undefined,
-  onSearchChange: undefined,
-};
 
 export default ItemPanel;

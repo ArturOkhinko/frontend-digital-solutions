@@ -1,35 +1,69 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ConfigProvider, Divider, message, Typography } from 'antd';
 import { v7 as uuidv7 } from 'uuid';
 import ItemPanel from './components/ItemPanel';
-import { createItem } from './api/items';
+import { createItem, fetchItems } from './api/items';
+import { deselectItems, fetchSelected, reorderSelected, selectItems } from './api/selected';
 import { useInfiniteItems } from './hooks/useInfiniteItems';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
-import { usePersistedState } from './hooks/usePersistedState';
 import { ItemId } from './types';
 
 const { Title } = Typography;
 const SEARCH_DEBOUNCE_MS = 300;
-const SELECTED_STORAGE_KEY = 'split-screen.selected';
 
 function App() {
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
-  const { ids: loadedIds, loading, loadMore, addId } = useInfiniteItems(debouncedSearch);
-  const [selectedIds, setSelectedIds] = usePersistedState<ItemId[]>(SELECTED_STORAGE_KEY, []);
+  const [availableSearch, setAvailableSearch] = useState('');
+  const [selectedSearch, setSelectedSearch] = useState('');
+  const [checkedAvailable, setCheckedAvailable] = useState<ItemId[]>([]);
+  const [checkedSelected, setCheckedSelected] = useState<ItemId[]>([]);
+  const [newId, setNewId] = useState('');
 
-  const selectItem = (id: ItemId) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  const debouncedAvailableSearch = useDebouncedValue(availableSearch, SEARCH_DEBOUNCE_MS);
+  const debouncedSelectedSearch = useDebouncedValue(selectedSearch, SEARCH_DEBOUNCE_MS);
+
+  const available = useInfiniteItems(fetchItems, debouncedAvailableSearch);
+  const selected = useInfiniteItems(fetchSelected, debouncedSelectedSearch);
+
+  const toggle = (setChecked: typeof setCheckedAvailable) => (id: ItemId) => {
+    setChecked((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
-  const deselectItem = (id: ItemId) => {
-    setSelectedIds((prev) => prev.filter((item) => item !== id));
+  const reloadBoth = () => {
+    available.reload();
+    selected.reload();
+  };
+
+  const addToSelection = async () => {
+    if (checkedAvailable.length === 0) {
+      return;
+    }
+    try {
+      await selectItems(checkedAvailable);
+      setCheckedAvailable([]);
+      reloadBoth();
+    } catch {
+      message.error('Failed to select items');
+    }
+  };
+
+  const removeFromSelection = async () => {
+    if (checkedSelected.length === 0) {
+      return;
+    }
+    try {
+      await deselectItems(checkedSelected);
+      setCheckedSelected([]);
+      reloadBoth();
+    } catch {
+      message.error('Failed to remove items');
+    }
   };
 
   const persistAndAdd = async (id: ItemId) => {
     try {
       await createItem(id);
-      addId(id);
+      setNewId('');
+      available.reload();
     } catch {
       message.error(`Failed to add item "${String(id)}"`);
     }
@@ -49,30 +83,17 @@ function App() {
     persistAndAdd(uuidv7());
   };
 
-  const reorderSelected = (draggedId: ItemId, targetId: ItemId) => {
-    setSelectedIds((prev) => {
-      if (draggedId === targetId) {
-        return prev;
-      }
-      const fromIndex = prev.indexOf(draggedId);
-      const toIndex = prev.indexOf(targetId);
-      if (fromIndex === -1 || toIndex === -1) {
-        return prev;
-      }
-
-      const next = prev.filter((id) => id !== draggedId);
-      const targetIndex = next.indexOf(targetId);
-      const insertIndex = fromIndex < toIndex ? targetIndex + 1 : targetIndex;
-
-      next.splice(insertIndex, 0, draggedId);
-      return next;
-    });
+  const reorder = async (draggedId: ItemId, targetId: ItemId) => {
+    const ordered = selected.ids.filter((id) => id !== draggedId);
+    const targetIndex = ordered.indexOf(targetId);
+    const afterId = targetIndex <= 0 ? null : ordered[targetIndex - 1];
+    try {
+      await reorderSelected(draggedId, afterId);
+      selected.reload();
+    } catch {
+      message.error('Failed to reorder');
+    }
   };
-
-  const availableIds = useMemo(
-    () => loadedIds.filter((id) => !selectedIds.includes(id)),
-    [loadedIds, selectedIds],
-  );
 
   return (
     <ConfigProvider>
@@ -89,27 +110,39 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           <ItemPanel
             title="Available"
-            ids={availableIds}
-            onItemClick={selectItem}
+            ids={available.ids}
             testId="available-panel"
             itemTestIdPrefix="available-item"
+            checkedIds={checkedAvailable}
+            onToggleCheck={toggle(setCheckedAvailable)}
+            searchValue={availableSearch}
+            onSearchChange={setAvailableSearch}
+            loading={available.loading}
+            onReachEnd={available.loadMore}
+            actionLabel="Add to selected"
+            onAction={addToSelection}
             onAddItem={addItem}
             onGenerateItem={addGeneratedItem}
-            onReachEnd={loadMore}
-            loading={loading}
-            searchValue={search}
-            onSearchChange={setSearch}
+            newId={newId}
+            onNewIdChange={setNewId}
           />
 
           <Divider type="vertical" style={{ height: 'auto', margin: '0 16px' }} />
 
           <ItemPanel
             title="Selected"
-            ids={selectedIds}
-            onItemClick={deselectItem}
+            ids={selected.ids}
             testId="selected-panel"
             itemTestIdPrefix="selected-item"
-            onReorder={reorderSelected}
+            checkedIds={checkedSelected}
+            onToggleCheck={toggle(setCheckedSelected)}
+            searchValue={selectedSearch}
+            onSearchChange={setSelectedSearch}
+            loading={selected.loading}
+            onReachEnd={selected.loadMore}
+            actionLabel="Remove"
+            onAction={removeFromSelection}
+            onReorder={reorder}
           />
         </div>
       </main>
