@@ -26,6 +26,19 @@ module.exports = {
     'react/react-in-jsx-scope': 'off',
     'react/jsx-filename-extension': ['warn', { extensions: ['.tsx'] }],
     'import/prefer-default-export': 'off',
+    'import/no-extraneous-dependencies': [
+      'error',
+      {
+        devDependencies: [
+          '**/*.test.{ts,tsx}',
+          '**/*.spec.{ts,tsx}',
+          '**/__mocks__/**',
+          '**/setupTests.ts',
+          'vite.config.ts',
+          'jest.config.cjs',
+        ],
+      },
+    ],
   },
   ignorePatterns: ['dist', 'node_modules', 'vite.config.ts', 'jest.config.cjs'],
 };
