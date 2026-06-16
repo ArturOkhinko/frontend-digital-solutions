@@ -1,4 +1,4 @@
-import { UIEvent, useRef } from 'react';
+import { UIEvent, useEffect, useRef } from 'react';
 import { Button, Card, Input, List, Space, Spin } from 'antd';
 import { ItemId } from '../types';
 
@@ -11,6 +11,7 @@ interface ItemPanelProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   loading?: boolean;
+  hasMore?: boolean;
   onReachEnd?: () => void;
   onReorder?: (draggedId: ItemId, targetId: ItemId) => void;
   onAddItem?: (rawId: string) => void;
@@ -30,6 +31,7 @@ function ItemPanel({
   searchValue,
   onSearchChange,
   loading = false,
+  hasMore = true,
   onReachEnd = undefined,
   onReorder = undefined,
   onAddItem = undefined,
@@ -38,9 +40,20 @@ function ItemPanel({
   onNewIdChange = undefined,
 }: ItemPanelProps) {
   const draggedIdRef = useRef<ItemId | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const isDraggable = Boolean(onReorder);
   const canAdd = Boolean(onAddItem);
+
+  useEffect(() => {
+    if (!onReachEnd || !hasMore || loading || ids.length === 0) {
+      return;
+    }
+    const element = listRef.current;
+    if (element && element.scrollHeight <= element.clientHeight) {
+      onReachEnd();
+    }
+  }, [ids, loading, hasMore, onReachEnd]);
 
   const handleAdd = () => {
     if (onAddItem) {
@@ -109,7 +122,11 @@ function ItemPanel({
         data-testid={`${testId}-filter`}
       />
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} onScroll={handleScroll}>
+      <div
+        ref={listRef}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+        onScroll={handleScroll}
+      >
         <List
           dataSource={ids}
           locale={{ emptyText: 'No items' }}

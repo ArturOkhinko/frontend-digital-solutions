@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ConfigProvider, Divider, message, Typography } from 'antd';
+import { Alert, Button, ConfigProvider, Divider, message, Typography } from 'antd';
 import { v7 as uuidv7 } from 'uuid';
 import ItemPanel from './components/ItemPanel';
 import { createItems, fetchItems } from './api/items';
@@ -153,6 +153,13 @@ function App() {
     modifyBatcher.current?.push({ type: 'reorder', id: draggedId, afterId });
   };
 
+  const hasError = available.error || selected.error;
+
+  const retry = () => {
+    available.reload();
+    selected.reload();
+  };
+
   return (
     <ConfigProvider>
       <main
@@ -165,6 +172,20 @@ function App() {
         }}
       >
         <Title level={2}>Split screen</Title>
+        {hasError && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="Connection problem — data may be out of date."
+            action={
+              <Button size="small" onClick={retry} data-testid="error-retry">
+                Retry
+              </Button>
+            }
+            data-testid="error-banner"
+          />
+        )}
         <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           <ItemPanel
             title="Available"
@@ -175,6 +196,7 @@ function App() {
             searchValue={availableSearch}
             onSearchChange={setAvailableSearch}
             loading={available.loading}
+            hasMore={available.hasMore}
             onReachEnd={() => {
               pendingMoreAvailable.current = true;
             }}
@@ -195,6 +217,7 @@ function App() {
             searchValue={selectedSearch}
             onSearchChange={setSelectedSearch}
             loading={selected.loading}
+            hasMore={selected.hasMore}
             onReachEnd={() => {
               pendingMoreSelected.current = true;
             }}

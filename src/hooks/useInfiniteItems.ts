@@ -3,7 +3,7 @@ import { ItemsPage } from '../api/items';
 import { ItemId } from '../types';
 
 const PAGE_SIZE = 20;
-const MAX_REFRESH = 100;
+const MAX_REFRESH = 1000;
 
 export type ItemsFetcher = (
   lastId?: ItemId,
@@ -15,6 +15,7 @@ export interface InfiniteItems {
   ids: ItemId[];
   loading: boolean;
   hasMore: boolean;
+  error: boolean;
   loadMore: () => void;
   reload: () => void;
   refresh: () => void;
@@ -24,6 +25,7 @@ export const useInfiniteItems = (fetcher: ItemsFetcher, search: string): Infinit
   const [ids, setIds] = useState<ItemId[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState(false);
 
   const cursorRef = useRef<ItemId | undefined>(undefined);
   const hasMoreRef = useRef(true);
@@ -55,6 +57,7 @@ export const useInfiniteItems = (fetcher: ItemsFetcher, search: string): Infinit
           const more = page.ids.length === PAGE_SIZE && page.lastId !== null;
           hasMoreRef.current = more;
           setHasMore(more);
+          setError(false);
           setIds((prev) => {
             const base = reset ? [] : prev;
             const known = new Set(base);
@@ -65,6 +68,7 @@ export const useInfiniteItems = (fetcher: ItemsFetcher, search: string): Infinit
           if (requestId === requestIdRef.current) {
             hasMoreRef.current = false;
             setHasMore(false);
+            setError(true);
           }
         })
         .finally(() => {
@@ -102,9 +106,10 @@ export const useInfiniteItems = (fetcher: ItemsFetcher, search: string): Infinit
         const more = page.ids.length === limit && page.lastId !== null;
         hasMoreRef.current = more;
         setHasMore(more);
+        setError(false);
         setIds(page.ids);
       })
-      .catch(() => undefined);
+      .catch(() => setError(true));
   }, [fetcher, search]);
 
   useEffect(() => {
@@ -113,5 +118,5 @@ export const useInfiniteItems = (fetcher: ItemsFetcher, search: string): Infinit
     load(true);
   }, [load]);
 
-  return { ids, loading, hasMore, loadMore, reload, refresh };
+  return { ids, loading, hasMore, error, loadMore, reload, refresh };
 };
