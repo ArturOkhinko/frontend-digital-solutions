@@ -4,10 +4,7 @@ export interface Batcher<T> {
   stop: () => void;
 }
 
-export const createBatcher = <T>(
-  intervalMs: number,
-  flush: (items: T[]) => void,
-): Batcher<T> => {
+export const createBatcher = <T>(intervalMs: number, flush: (items: T[]) => void): Batcher<T> => {
   let buffer: T[] = [];
 
   const drain = () => {

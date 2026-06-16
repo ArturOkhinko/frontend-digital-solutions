@@ -9,7 +9,10 @@ const toPage = (data: { items: Item[]; lastId: ItemId | null }): ItemsPage => ({
 });
 
 const keyForIds = (ids: ItemId[]): string =>
-  [...ids].map((id) => String(id)).sort().join(',');
+  [...ids]
+    .map((id) => String(id))
+    .sort()
+    .join(',');
 
 export const fetchSelected = (
   lastId?: ItemId,
@@ -32,7 +35,7 @@ export const fetchSelected = (
     if (!response.ok) {
       throw new Error(`Failed to load selected (status ${response.status})`);
     }
-    return toPage((await response.json()));
+    return toPage(await response.json());
   });
 };
 

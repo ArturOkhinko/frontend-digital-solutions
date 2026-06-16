@@ -1,5 +1,9 @@
 import { CSSProperties } from 'react';
-import { FixedSizeList as List, ListChildComponentProps, ListOnItemsRenderedProps } from 'react-window';
+import {
+  FixedSizeList as List,
+  ListChildComponentProps,
+  ListOnItemsRenderedProps,
+} from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { Spin } from 'antd';
 import {
@@ -77,11 +81,11 @@ function SortableRow({ id, style, data }: { id: ItemId; style: CSSProperties; da
       ref={setNodeRef}
       style={composed}
       data-testid={`${data.itemTestIdPrefix}-${id}`}
+      {...attributes}
+      {...listeners}
       role="button"
       tabIndex={0}
       onClick={() => data.onItemClick(id)}
-      {...attributes}
-      {...listeners}
       onKeyDown={(event) => {
         listeners?.onKeyDown?.(event);
         if (event.key === 'Enter') {
