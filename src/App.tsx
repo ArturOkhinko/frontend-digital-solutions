@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, ConfigProvider, Divider, message, Typography } from 'antd';
 import { v7 as uuidv7 } from 'uuid';
+import { arrayMove } from '@dnd-kit/sortable';
 import ItemPanel from './components/ItemPanel';
 import { createItems, fetchItems } from './api/items';
 import { fetchSelected } from './api/selected';
@@ -15,6 +16,10 @@ const SEARCH_DEBOUNCE_MS = 300;
 const ADD_BATCH_MS = 10000;
 const MODIFY_BATCH_MS = 1000;
 const READ_INTERVAL_MS = 1000;
+const REORDER_SETTLE_MS = 2500;
+
+const sameOrder = (a: ItemId[], b: ItemId[]): boolean =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
 
 function App() {
   const [availableSearch, setAvailableSearch] = useState('');
@@ -22,6 +27,7 @@ function App() {
   const [newId, setNewId] = useState('');
   const [pendingSelect, setPendingSelect] = useState<ItemId[]>([]);
   const [pendingDeselect, setPendingDeselect] = useState<ItemId[]>([]);
+  const [reorderView, setReorderView] = useState<ItemId[] | null>(null);
 
   const debouncedAvailableSearch = useDebouncedValue(availableSearch, SEARCH_DEBOUNCE_MS);
   const debouncedSelectedSearch = useDebouncedValue(selectedSearch, SEARCH_DEBOUNCE_MS);
@@ -49,6 +55,7 @@ function App() {
       flushModifications(ops).catch(() => {
         setPendingSelect([]);
         setPendingDeselect([]);
+        setReorderView(null);
         message.error('Failed to update selection');
       });
     });
@@ -91,12 +98,14 @@ function App() {
 
   const selectItem = (id: ItemId) => {
     modifyBatcher.current?.push({ type: 'select', ids: [id] });
+    setReorderView(null);
     setPendingDeselect((prev) => prev.filter((item) => item !== id));
     setPendingSelect((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
 
   const deselectItem = (id: ItemId) => {
     modifyBatcher.current?.push({ type: 'deselect', ids: [id] });
+    setReorderView(null);
     setPendingSelect((prev) => prev.filter((item) => item !== id));
     setPendingDeselect((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
@@ -123,13 +132,27 @@ function App() {
     [available.ids, pendingSelect, pendingDeselect],
   );
 
-  const selectedIds = useMemo(
+  const derivedSelected = useMemo(
     () => [
       ...selected.ids.filter((id) => !pendingDeselect.includes(id)),
       ...pendingSelect.filter((id) => !selected.ids.includes(id)),
     ],
     [selected.ids, pendingSelect, pendingDeselect],
   );
+
+  const selectedIds = reorderView ?? derivedSelected;
+
+  useEffect(() => {
+    setReorderView((prev) => (prev && sameOrder(prev, derivedSelected) ? null : prev));
+  }, [derivedSelected]);
+
+  useEffect(() => {
+    if (!reorderView) {
+      return undefined;
+    }
+    const timer = setTimeout(() => setReorderView(null), REORDER_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [reorderView]);
 
   const addItem = (rawId: string) => {
     const trimmed = rawId.trim();
@@ -147,9 +170,15 @@ function App() {
   };
 
   const reorder = (draggedId: ItemId, targetId: ItemId) => {
-    const ordered = selectedIds.filter((id) => id !== draggedId);
-    const targetIndex = ordered.indexOf(targetId);
-    const afterId = targetIndex <= 0 ? null : ordered[targetIndex - 1];
+    const oldIndex = selectedIds.indexOf(draggedId);
+    const newIndex = selectedIds.indexOf(targetId);
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
+    const nextOrder = arrayMove(selectedIds, oldIndex, newIndex);
+    const position = nextOrder.indexOf(draggedId);
+    const afterId = position === 0 ? null : nextOrder[position - 1];
+    setReorderView(nextOrder);
     modifyBatcher.current?.push({ type: 'reorder', id: draggedId, afterId });
   };
 
