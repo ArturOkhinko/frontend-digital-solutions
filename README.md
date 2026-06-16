@@ -1,14 +1,59 @@
 # Frontend
 
-React + TypeScript + Vite + antd, with Jest + Testing Library and ESLint (airbnb).
+Интерфейс на React, TypeScript и Vite. Списки виртуализированы. Сортировка работает перетаскиванием и с клавиатуры.
 
-## Scripts
+## Запуск локально
+
+Установи зависимости.
 
 ```
 npm install
-npm run dev        # vite dev server (http://localhost:5173)
-npm run build      # type-check + production build
-npm run typecheck  # tsc --noEmit
-npm run lint       # eslint (airbnb)
-npm test           # jest
 ```
+
+Создай файл .env.
+
+В файле .env есть настройка PORT. Это порт на котором откроется фронтенд.
+
+```
+PORT=5005
+```
+
+Адрес backend задаётся переменной VITE_API_BASE_URL. Если её не указать, по умолчанию берётся http://localhost:5003/api и для локального запуска этого хватает. Если backend на другом адресе, добавь строку в .env.
+
+```
+VITE_API_BASE_URL=http://localhost:5003/api
+```
+
+Запусти приложение.
+
+```
+npm run start
+```
+
+Открой в браузере http://localhost:5005
+
+## Сборка для продакшена
+
+Команда собирает статические файлы в папку dist. Адрес backend нужно указать при сборке, потому что он вшивается в файлы.
+
+```
+VITE_API_BASE_URL=https://ваш-домен/api npm run build
+```
+
+Готовую папку dist отдаёт любой статический сервер, например nginx.
+
+## Тесты и проверки
+
+```
+npm test
+npm run lint
+npm run typecheck
+```
+
+## Важно
+
+Адрес backend вшивается в момент сборки, а не во время работы. После изменения VITE_API_BASE_URL нужно собрать заново.
+
+Переменная обязательно должна начинаться с VITE\_, иначе Vite её не подставит.
+
+В адресе должна быть часть /api в конце.
