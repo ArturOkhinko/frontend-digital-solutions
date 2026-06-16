@@ -3,15 +3,13 @@ import { ConfigProvider, Divider, message, Typography } from 'antd';
 import { v7 as uuidv7 } from 'uuid';
 import ItemPanel from './components/ItemPanel';
 import { createItem } from './api/items';
+import { useInfiniteItems } from './hooks/useInfiniteItems';
 import { ItemId } from './types';
 
 const { Title } = Typography;
 
-const TOTAL_ITEMS = 21;
-const INITIAL_IDS: ItemId[] = Array.from({ length: TOTAL_ITEMS }, (_, index) => index);
-
 function App() {
-  const [allIds, setAllIds] = useState<ItemId[]>(INITIAL_IDS);
+  const { ids: loadedIds, loading, loadMore, addId } = useInfiniteItems();
   const [selectedIds, setSelectedIds] = useState<ItemId[]>([]);
 
   const selectItem = (id: ItemId) => {
@@ -23,12 +21,9 @@ function App() {
   };
 
   const persistAndAdd = async (id: ItemId) => {
-    if (allIds.some((item) => item === id)) {
-      return;
-    }
     try {
       await createItem(id);
-      setAllIds((prev) => (prev.some((item) => item === id) ? prev : [...prev, id]));
+      addId(id);
     } catch {
       message.error(`Failed to add item "${String(id)}"`);
     }
@@ -69,8 +64,8 @@ function App() {
   };
 
   const availableIds = useMemo(
-    () => allIds.filter((id) => !selectedIds.includes(id)),
-    [allIds, selectedIds],
+    () => loadedIds.filter((id) => !selectedIds.includes(id)),
+    [loadedIds, selectedIds],
   );
 
   return (
@@ -94,6 +89,8 @@ function App() {
             itemTestIdPrefix="available-item"
             onAddItem={addItem}
             onGenerateItem={addGeneratedItem}
+            onReachEnd={loadMore}
+            loading={loading}
           />
 
           <Divider type="vertical" style={{ height: 'auto', margin: '0 16px' }} />

@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import { Button, Card, Input, List, Space } from 'antd';
+import { UIEvent, useMemo, useRef, useState } from 'react';
+import { Button, Card, Input, List, Space, Spin } from 'antd';
 import { ItemId } from '../types';
 
 interface ItemPanelProps {
@@ -11,7 +11,11 @@ interface ItemPanelProps {
   onReorder?: (draggedId: ItemId, targetId: ItemId) => void;
   onAddItem?: (rawId: string) => void;
   onGenerateItem?: () => void;
+  onReachEnd?: () => void;
+  loading?: boolean;
 }
+
+const SCROLL_THRESHOLD = 48;
 
 function ItemPanel({
   title,
@@ -22,6 +26,8 @@ function ItemPanel({
   onReorder = undefined,
   onAddItem = undefined,
   onGenerateItem = undefined,
+  onReachEnd = undefined,
+  loading = false,
 }: ItemPanelProps) {
   const [filter, setFilter] = useState('');
   const [newId, setNewId] = useState('');
@@ -50,6 +56,17 @@ function ItemPanel({
     draggedIdRef.current = null;
     if (onReorder && draggedId !== null) {
       onReorder(draggedId, targetId);
+    }
+  };
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (!onReachEnd) {
+      return;
+    }
+    const element = event.currentTarget;
+    const distanceToBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    if (distanceToBottom <= SCROLL_THRESHOLD) {
+      onReachEnd();
     }
   };
 
@@ -95,7 +112,7 @@ function ItemPanel({
         data-testid={`${testId}-filter`}
       />
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} onScroll={handleScroll}>
         <List
           dataSource={visibleIds}
           locale={{ emptyText: 'No items' }}
@@ -124,6 +141,11 @@ function ItemPanel({
             </List.Item>
           )}
         />
+        {loading && (
+          <div style={{ padding: 8, textAlign: 'center' }} data-testid={`${testId}-loading`}>
+            <Spin size="small" />
+          </div>
+        )}
       </div>
     </Card>
   );
