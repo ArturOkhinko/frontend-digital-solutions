@@ -1,13 +1,16 @@
 import { useMemo, useRef, useState } from 'react';
-import { Card, Input, List } from 'antd';
+import { Button, Card, Input, List, Space } from 'antd';
+import { ItemId } from '../types';
 
 interface ItemPanelProps {
   title: string;
-  ids: number[];
-  onItemClick: (id: number) => void;
+  ids: ItemId[];
+  onItemClick: (id: ItemId) => void;
   testId: string;
   itemTestIdPrefix: string;
-  onReorder?: (draggedId: number, targetId: number) => void;
+  onReorder?: (draggedId: ItemId, targetId: ItemId) => void;
+  onAddItem?: (rawId: string) => void;
+  onGenerateItem?: () => void;
 }
 
 function ItemPanel({
@@ -17,9 +20,12 @@ function ItemPanel({
   testId,
   itemTestIdPrefix,
   onReorder = undefined,
+  onAddItem = undefined,
+  onGenerateItem = undefined,
 }: ItemPanelProps) {
   const [filter, setFilter] = useState('');
-  const draggedIdRef = useRef<number | null>(null);
+  const [newId, setNewId] = useState('');
+  const draggedIdRef = useRef<ItemId | null>(null);
 
   const visibleIds = useMemo(() => {
     const query = filter.trim();
@@ -30,8 +36,16 @@ function ItemPanel({
   }, [ids, filter]);
 
   const isDraggable = Boolean(onReorder);
+  const canAdd = Boolean(onAddItem);
 
-  const handleDrop = (targetId: number) => {
+  const handleAdd = () => {
+    if (onAddItem) {
+      onAddItem(newId);
+      setNewId('');
+    }
+  };
+
+  const handleDrop = (targetId: ItemId) => {
     const draggedId = draggedIdRef.current;
     draggedIdRef.current = null;
     if (onReorder && draggedId !== null) {
@@ -54,6 +68,24 @@ function ItemPanel({
       }}
       data-testid={testId}
     >
+      {canAdd && (
+        <Space.Compact style={{ marginBottom: 12, width: '100%' }}>
+          <Input
+            placeholder="New id (number or string)"
+            value={newId}
+            onChange={(event) => setNewId(event.target.value)}
+            onPressEnter={handleAdd}
+            data-testid={`${testId}-new-id`}
+          />
+          <Button onClick={handleAdd} data-testid={`${testId}-add`}>
+            Add
+          </Button>
+          <Button type="primary" onClick={onGenerateItem} data-testid={`${testId}-generate`}>
+            UUID v7
+          </Button>
+        </Space.Compact>
+      )}
+
       <Input
         allowClear
         placeholder="Filter by id"
@@ -62,6 +94,7 @@ function ItemPanel({
         style={{ marginBottom: 12 }}
         data-testid={`${testId}-filter`}
       />
+
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <List
           dataSource={visibleIds}
@@ -98,6 +131,8 @@ function ItemPanel({
 
 ItemPanel.defaultProps = {
   onReorder: undefined,
+  onAddItem: undefined,
+  onGenerateItem: undefined,
 };
 
 export default ItemPanel;
