@@ -18,6 +18,29 @@ function App() {
     setSelectedIds((prev) => prev.filter((item) => item !== id));
   };
 
+  // Reorder by anchoring to the target id in the full list,
+  // so it stays correct even when the panel is filtered.
+  const reorderSelected = (draggedId: number, targetId: number) => {
+    setSelectedIds((prev) => {
+      if (draggedId === targetId) {
+        return prev;
+      }
+      const fromIndex = prev.indexOf(draggedId);
+      const toIndex = prev.indexOf(targetId);
+      if (fromIndex === -1 || toIndex === -1) {
+        return prev;
+      }
+
+      const next = prev.filter((id) => id !== draggedId);
+      const targetIndex = next.indexOf(targetId);
+      // Moving down: drop after the target. Moving up: drop before it.
+      const insertIndex = fromIndex < toIndex ? targetIndex + 1 : targetIndex;
+
+      next.splice(insertIndex, 0, draggedId);
+      return next;
+    });
+  };
+
   const availableIds = useMemo(
     () => ALL_IDS.filter((id) => !selectedIds.includes(id)),
     [selectedIds],
@@ -44,6 +67,7 @@ function App() {
             onItemClick={deselectItem}
             testId="selected-panel"
             itemTestIdPrefix="selected-item"
+            onReorder={reorderSelected}
           />
         </div>
       </main>
