@@ -11,17 +11,20 @@ const availablePage = {
 
 const emptyPage = { items: [], lastId: null };
 
+const originalFetch = global.fetch;
+
 describe('App', () => {
   beforeEach(() => {
-    jest.spyOn(global, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
       const url = String(input);
       const body = url.includes('/selected') ? emptyPage : availablePage;
       return Promise.resolve(jsonResponse(body));
-    });
+    }) as unknown as typeof fetch;
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    jest.clearAllMocks();
+    global.fetch = originalFetch;
   });
 
   it('renders the heading', () => {
