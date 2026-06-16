@@ -30,6 +30,7 @@ module.exports = {
     'import/no-extraneous-dependencies': [
       'error',
       {
+        packageDir: __dirname,
         devDependencies: [
           '**/*.test.{ts,tsx}',
           '**/*.spec.{ts,tsx}',
