@@ -129,10 +129,4 @@ function ItemPanel({
   );
 }
 
-ItemPanel.defaultProps = {
-  onReorder: undefined,
-  onAddItem: undefined,
-  onGenerateItem: undefined,
-};
-
 export default ItemPanel;

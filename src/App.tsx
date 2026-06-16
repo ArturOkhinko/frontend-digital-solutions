@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { ConfigProvider, Divider, Typography } from 'antd';
+import { ConfigProvider, Divider, message, Typography } from 'antd';
 import { v7 as uuidv7 } from 'uuid';
 import ItemPanel from './components/ItemPanel';
+import { createItem } from './api/items';
 import { ItemId } from './types';
 
 const { Title } = Typography;
 
-const TOTAL_ITEMS = 21; // ids from 0 to 20 inclusive
+const TOTAL_ITEMS = 21;
 const INITIAL_IDS: ItemId[] = Array.from({ length: TOTAL_ITEMS }, (_, index) => index);
 
 function App() {
@@ -21,7 +22,18 @@ function App() {
     setSelectedIds((prev) => prev.filter((item) => item !== id));
   };
 
-  // Add an item with an arbitrary id (numeric or string).
+  const persistAndAdd = async (id: ItemId) => {
+    if (allIds.some((item) => item === id)) {
+      return;
+    }
+    try {
+      await createItem(id);
+      setAllIds((prev) => (prev.some((item) => item === id) ? prev : [...prev, id]));
+    } catch {
+      message.error(`Failed to add item "${String(id)}"`);
+    }
+  };
+
   const addItem = (rawId: string) => {
     const trimmed = rawId.trim();
     if (!trimmed) {
@@ -29,16 +41,13 @@ function App() {
     }
     const asNumber = Number(trimmed);
     const id: ItemId = !Number.isNaN(asNumber) && String(asNumber) === trimmed ? asNumber : trimmed;
-    setAllIds((prev) => (prev.some((item) => item === id) ? prev : [...prev, id]));
+    void persistAndAdd(id);
   };
 
-  // Auto-generate an id using UUID v7.
   const addGeneratedItem = () => {
-    setAllIds((prev) => [...prev, uuidv7()]);
+    void persistAndAdd(uuidv7());
   };
 
-  // Reorder by anchoring to the target id in the full list,
-  // so it stays correct even when the panel is filtered.
   const reorderSelected = (draggedId: ItemId, targetId: ItemId) => {
     setSelectedIds((prev) => {
       if (draggedId === targetId) {
@@ -52,7 +61,6 @@ function App() {
 
       const next = prev.filter((id) => id !== draggedId);
       const targetIndex = next.indexOf(targetId);
-      // Moving down: drop after the target. Moving up: drop before it.
       const insertIndex = fromIndex < toIndex ? targetIndex + 1 : targetIndex;
 
       next.splice(insertIndex, 0, draggedId);
