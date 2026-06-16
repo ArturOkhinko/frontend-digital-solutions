@@ -4,12 +4,16 @@ import { v7 as uuidv7 } from 'uuid';
 import ItemPanel from './components/ItemPanel';
 import { createItem } from './api/items';
 import { useInfiniteItems } from './hooks/useInfiniteItems';
+import { useDebouncedValue } from './hooks/useDebouncedValue';
 import { ItemId } from './types';
 
 const { Title } = Typography;
+const SEARCH_DEBOUNCE_MS = 300;
 
 function App() {
-  const { ids: loadedIds, loading, loadMore, addId } = useInfiniteItems();
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
+  const { ids: loadedIds, loading, loadMore, addId } = useInfiniteItems(debouncedSearch);
   const [selectedIds, setSelectedIds] = useState<ItemId[]>([]);
 
   const selectItem = (id: ItemId) => {
@@ -91,6 +95,8 @@ function App() {
             onGenerateItem={addGeneratedItem}
             onReachEnd={loadMore}
             loading={loading}
+            searchValue={search}
+            onSearchChange={setSearch}
           />
 
           <Divider type="vertical" style={{ height: 'auto', margin: '0 16px' }} />

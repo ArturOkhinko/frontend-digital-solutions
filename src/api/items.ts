@@ -10,10 +10,13 @@ export interface ItemsPage {
   lastId: ItemId | null;
 }
 
-export const fetchItems = async (lastId?: ItemId): Promise<ItemsPage> => {
+export const fetchItems = async (lastId?: ItemId, search?: string): Promise<ItemsPage> => {
   const url = new URL(`${API_BASE_URL}/items`);
   if (lastId !== undefined) {
     url.searchParams.set('lastId', String(lastId));
+  }
+  if (search) {
+    url.searchParams.set('search', search);
   }
 
   const response = await fetch(url);

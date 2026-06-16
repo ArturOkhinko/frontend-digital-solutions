@@ -13,6 +13,8 @@ interface ItemPanelProps {
   onGenerateItem?: () => void;
   onReachEnd?: () => void;
   loading?: boolean;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 const SCROLL_THRESHOLD = 48;
@@ -28,18 +30,34 @@ function ItemPanel({
   onGenerateItem = undefined,
   onReachEnd = undefined,
   loading = false,
+  searchValue = undefined,
+  onSearchChange = undefined,
 }: ItemPanelProps) {
-  const [filter, setFilter] = useState('');
+  const [localFilter, setLocalFilter] = useState('');
   const [newId, setNewId] = useState('');
   const draggedIdRef = useRef<ItemId | null>(null);
 
+  const isServerSearch = Boolean(onSearchChange);
+  const filterValue = isServerSearch ? searchValue ?? '' : localFilter;
+
   const visibleIds = useMemo(() => {
-    const query = filter.trim();
+    if (isServerSearch) {
+      return ids;
+    }
+    const query = localFilter.trim();
     if (!query) {
       return ids;
     }
     return ids.filter((id) => String(id).includes(query));
-  }, [ids, filter]);
+  }, [ids, localFilter, isServerSearch]);
+
+  const handleFilterChange = (value: string) => {
+    if (onSearchChange) {
+      onSearchChange(value);
+    } else {
+      setLocalFilter(value);
+    }
+  };
 
   const isDraggable = Boolean(onReorder);
   const canAdd = Boolean(onAddItem);
@@ -106,8 +124,8 @@ function ItemPanel({
       <Input
         allowClear
         placeholder="Filter by id"
-        value={filter}
-        onChange={(event) => setFilter(event.target.value)}
+        value={filterValue}
+        onChange={(event) => handleFilterChange(event.target.value)}
         style={{ marginBottom: 12 }}
         data-testid={`${testId}-filter`}
       />

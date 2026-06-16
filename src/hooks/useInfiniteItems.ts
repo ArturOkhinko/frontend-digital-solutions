@@ -13,42 +13,58 @@ export interface InfiniteItems {
   addId: (id: ItemId) => void;
 }
 
-export const useInfiniteItems = (): InfiniteItems => {
+export const useInfiniteItems = (search: string): InfiniteItems => {
   const [ids, setIds] = useState<ItemId[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
   const cursorRef = useRef<ItemId | undefined>(undefined);
-  const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
+  const loadingRef = useRef(false);
+  const searchRef = useRef(search);
+  const requestIdRef = useRef(0);
 
-  const loadMore = useCallback(() => {
-    if (loadingRef.current || !hasMoreRef.current) {
+  const load = useCallback((reset: boolean) => {
+    if (!reset && (loadingRef.current || !hasMoreRef.current)) {
       return;
     }
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     loadingRef.current = true;
     setLoading(true);
 
-    fetchItems(cursorRef.current)
+    const cursor = reset ? undefined : cursorRef.current;
+    fetchItems(cursor, searchRef.current || undefined)
       .then((page) => {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
         cursorRef.current = page.lastId ?? cursorRef.current;
         const more = page.ids.length === PAGE_SIZE && page.lastId !== null;
         hasMoreRef.current = more;
         setHasMore(more);
         setIds((prev) => {
-          const known = new Set(prev);
-          return [...prev, ...page.ids.filter((id) => !known.has(id))];
+          const base = reset ? [] : prev;
+          const known = new Set(base);
+          return [...base, ...page.ids.filter((id) => !known.has(id))];
         });
       })
       .catch(() => {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
         hasMoreRef.current = false;
         setHasMore(false);
       })
       .finally(() => {
-        loadingRef.current = false;
-        setLoading(false);
+        if (requestId === requestIdRef.current) {
+          loadingRef.current = false;
+          setLoading(false);
+        }
       });
   }, []);
+
+  const loadMore = useCallback(() => load(false), [load]);
 
   const addId = useCallback((id: ItemId) => {
     setIds((prev) => {
@@ -67,8 +83,11 @@ export const useInfiniteItems = (): InfiniteItems => {
   }, []);
 
   useEffect(() => {
-    loadMore();
-  }, [loadMore]);
+    searchRef.current = search;
+    cursorRef.current = undefined;
+    hasMoreRef.current = true;
+    load(true);
+  }, [search, load]);
 
   return { ids, loading, hasMore, loadMore, addId };
 };
